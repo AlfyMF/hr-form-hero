@@ -1,27 +1,42 @@
+import { useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./lib/queryClient";
+import { Navigation } from "./components/Navigation";
+import { Dashboard } from "./components/Dashboard";
+import { HireXForm } from "./components/HireXForm";
+import { Profile } from "./components/Profile";
 
-const queryClient = new QueryClient();
+const App = () => {
+  const [currentView, setCurrentView] = useState<"dashboard" | "form" | "profile">("dashboard");
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+  const renderCurrentView = () => {
+    switch (currentView) {
+      case "dashboard":
+        return <Dashboard onCreateNew={() => setCurrentView("form")} />;
+      case "form":
+        return <HireXForm />;
+      case "profile":
+        return <Profile />;
+      default:
+        return <Dashboard onCreateNew={() => setCurrentView("form")} />;
+    }
+  };
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <div className="min-h-screen bg-background">
+          <Navigation currentView={currentView} onViewChange={setCurrentView} />
+          {renderCurrentView()}
+        </div>
+        <Toaster />
+        <Sonner />
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
