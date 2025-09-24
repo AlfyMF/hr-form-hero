@@ -263,12 +263,12 @@ export const Dashboard = ({ onCreateNew }: DashboardProps) => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="lg:col-span-2">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search by job title or requester..."
+                    placeholder="Search by job title, requisition number, department, or requester..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
@@ -277,8 +277,8 @@ export const Dashboard = ({ onCreateNew }: DashboardProps) => {
               </div>
               
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full md:w-[200px]">
-                  <SelectValue placeholder="Filter by status" />
+                <SelectTrigger>
+                  <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
@@ -291,8 +291,8 @@ export const Dashboard = ({ onCreateNew }: DashboardProps) => {
               </Select>
 
               <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                <SelectTrigger className="w-full md:w-[200px]">
-                  <SelectValue placeholder="Filter by department" />
+                <SelectTrigger>
+                  <SelectValue placeholder="All Departments" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Departments</SelectItem>
@@ -304,6 +304,47 @@ export const Dashboard = ({ onCreateNew }: DashboardProps) => {
                   <SelectItem value="Analytics">Analytics</SelectItem>
                 </SelectContent>
               </Select>
+
+              <Button variant="outline" className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Date Range
+              </Button>
+            </div>
+
+            {/* Quick Filters */}
+            <div className="flex flex-wrap gap-2 mt-4">
+              <Badge 
+                variant="secondary" 
+                className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
+                onClick={() => setStatusFilter("pending")}
+              >
+                Pending Reviews
+              </Badge>
+              <Badge 
+                variant="secondary" 
+                className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
+                onClick={() => setStatusFilter("draft")}
+              >
+                My Drafts
+              </Badge>
+              <Badge 
+                variant="secondary" 
+                className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
+                onClick={() => setDepartmentFilter("Engineering")}
+              >
+                Engineering
+              </Badge>
+              <Badge 
+                variant="secondary" 
+                className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
+                onClick={() => {
+                  setStatusFilter("all");
+                  setDepartmentFilter("all");
+                  setSearchTerm("");
+                }}
+              >
+                Clear All
+              </Badge>
             </div>
           </CardContent>
         </Card>

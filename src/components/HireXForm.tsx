@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,8 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { 
   Briefcase, 
@@ -22,58 +20,35 @@ import {
   Building,
   GraduationCap,
   Settings,
-  FileText
+  FileText,
+  Save
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { jobRequisitionSchema, JobRequisitionFormData } from "@/lib/schemas";
 import { FormStepper } from "./multi-step/FormStepper";
 import { MultiSelectSkills } from "./multi-step/MultiSelectSkills";
 
-const FORM_STEPS = [
-  {
-    id: 1,
-    title: "Basic Details",
-    description: "Job type, title, department, and budget"
-  },
-  {
-    id: 2,
-    title: "Skills & Qualifications",
-    description: "Required skills, experience, and education"
-  },
-  {
-    id: 3,
-    title: "Project & Client",
-    description: "Project details and client information"
-  },
-  {
-    id: 4,
-    title: "Location & Shift",
-    description: "Work mode, location, and schedule"
-  },
-  {
-    id: 5,
-    title: "Job Description",
-    description: "Purpose, duties, and expectations"
-  }
-];
-
 export const HireXForm = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [workArrangement, setWorkArrangement] = useState<"offshore" | "onsite" | "">("");
   const { toast } = useToast();
 
   const form = useForm<JobRequisitionFormData>({
     resolver: zodResolver(jobRequisitionSchema),
     defaultValues: {
-      jobType: "",
+      workArrangement: undefined,
+      jobType: undefined,
       jobTitle: "",
-      department: "",
       requestedDate: "",
+      department: "",
       requestedBy: "",
       hiringManager: "",
       numberOfPositions: 1,
-      billable: false,
+      expectedDateOfOnboarding: "",
+      idealStartDate: "",
+      billable: undefined,
       clientBillingRate: 0,
       totalBudgetMin: 0,
       totalBudgetMax: 0,
@@ -87,55 +62,129 @@ export const HireXForm = () => {
       projectName: "",
       clientName: "",
       businessUnit: "",
-      workMode: "remote",
+      projectLocation: "",
+      onsiteWorkMode: undefined,
       onsiteLocation: "",
-      onsiteDays: 0,
-      shift: "",
+      onsiteDaysInOffice: 0,
+      workShift: "",
       preferredTimezone: "",
       jobPurpose: "",
-      duties: "",
-      specifications: "",
+      primaryDuties: "",
       goodToHave: "",
+      jobSpecifications: "",
       additionalNotes: "",
+      onsiteSpecificWorkMode: undefined,
+      onsiteSpecificLocation: "",
+      onsiteSpecificDaysInOffice: 0,
+      onsiteSpecificWorkShift: "",
+      onsiteSpecificPreferredTimezone: "",
+      additionalInstructions: "",
+      status: "draft",
+      currentStep: 1,
     },
     mode: "onChange"
   });
 
-  const nextStep = async () => {
-    const isStepValid = await validateCurrentStep();
-    if (isStepValid) {
-      setCompletedSteps(prev => new Set([...prev, currentStep]));
-      setCurrentStep(prev => Math.min(prev + 1, FORM_STEPS.length));
+  // Watch work arrangement to determine steps
+  const watchWorkArrangement = form.watch("workArrangement");
+  
+  useEffect(() => {
+    if (watchWorkArrangement) {
+      setWorkArrangement(watchWorkArrangement);
+    }
+  }, [watchWorkArrangement]);
+
+  // Dynamic steps based on work arrangement
+  const getSteps = () => {
+    const baseSteps = [
+      { id: 1, title: "Work Arrangement", description: "Choose offshore or onsite" },
+      { id: 2, title: "Basic Details", description: "Job type, title, department, and budget" },
+      { id: 3, title: "Skills & Qualifications", description: "Required skills, experience, and education" },
+      { id: 4, title: "Project & Client", description: "Project details and client information" },
+      { id: 5, title: "Location & Shift", description: "Work mode, location, and schedule" },
+      { id: 6, title: "Job Description", description: "Purpose, duties, and expectations" }
+    ];
+
+    if (workArrangement === "onsite") {
+      return [
+        ...baseSteps,
+        { id: 7, title: "Onsite Specific", description: "Additional onsite requirements" }
+      ];
+    }
+
+    return baseSteps;
+  };
+
+  const steps = getSteps();
+  const maxSteps = steps.length;
+
+  const nextStep = () => {
+    if (currentStep < maxSteps) {
+      setCurrentStep(prev => prev + 1);
     }
   };
 
   const previousStep = () => {
-    setCurrentStep(prev => Math.max(prev - 1, 1));
+    if (currentStep > 1) {
+      setCurrentStep(prev => prev - 1);
+    }
   };
 
-  const validateCurrentStep = async () => {
-    const fieldsByStep = {
-      1: ['jobType', 'jobTitle', 'department', 'requestedDate', 'requestedBy', 'hiringManager', 'numberOfPositions', 'totalBudgetMin', 'totalBudgetMax', 'expectedSalaryMin', 'expectedSalaryMax'],
-      2: ['primarySkills', 'experienceYears', 'education'],
-      3: ['projectName', 'clientName', 'businessUnit'],
-      4: ['workMode', 'shift', 'preferredTimezone'],
-      5: ['jobPurpose', 'duties', 'specifications']
-    };
+  const saveAndContinue = async () => {
+    try {
+      const currentData = form.getValues();
+      currentData.currentStep = currentStep;
+      
+      // Save as draft (would be API call in real app)
+      console.log("Saving draft:", currentData);
+      
+      toast({
+        title: "Draft Saved",
+        description: "Your progress has been saved as a draft.",
+      });
 
-    const fieldsToValidate = fieldsByStep[currentStep as keyof typeof fieldsByStep] || [];
-    const isValid = await form.trigger(fieldsToValidate as any);
-    return isValid;
+      if (currentStep < maxSteps) {
+        setCurrentStep(prev => prev + 1);
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save draft. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const onSubmit = async (data: JobRequisitionFormData) => {
-    console.log("Job Requisition Submitted:", data);
-    
-    toast({
-      title: "Job Requisition Submitted",
-      description: "Your job requisition has been successfully submitted for review.",
-    });
-    
-    setIsSubmitted(true);
+    try {
+      // Validate entire form before submission
+      const validationResult = jobRequisitionSchema.safeParse(data);
+      
+      if (!validationResult.success) {
+        toast({
+          title: "Validation Error",
+          description: "Please complete all required fields before submitting.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      data.status = "submitted";
+      console.log("Job Requisition Submitted:", data);
+      
+      toast({
+        title: "Job Requisition Submitted",
+        description: "Your job requisition has been successfully submitted for review.",
+      });
+      
+      setIsSubmitted(true);
+    } catch (error) {
+      toast({
+        title: "Submission Error",
+        description: "Failed to submit requisition. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (isSubmitted) {
@@ -166,6 +215,7 @@ export const HireXForm = () => {
                     setIsSubmitted(false);
                     setCurrentStep(1);
                     setCompletedSteps(new Set());
+                    setWorkArrangement("");
                     form.reset();
                   }}
                   variant="outline"
@@ -184,17 +234,21 @@ export const HireXForm = () => {
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:
-        return <BasicDetailsStep form={form} />;
+        return <WorkArrangementStep form={form} />;
       case 2:
-        return <SkillsQualificationsStep form={form} />;
+        return <BasicDetailsStep form={form} workArrangement={workArrangement} />;
       case 3:
-        return <ProjectClientStep form={form} />;
+        return <SkillsQualificationsStep form={form} />;
       case 4:
-        return <LocationShiftStep form={form} />;
+        return <ProjectClientStep form={form} />;
       case 5:
+        return <LocationShiftStep form={form} />;
+      case 6:
         return <JobDescriptionStep form={form} />;
+      case 7:
+        return workArrangement === "onsite" ? <OnsiteSpecificStep form={form} /> : null;
       default:
-        return <BasicDetailsStep form={form} />;
+        return <WorkArrangementStep form={form} />;
     }
   };
 
@@ -205,13 +259,18 @@ export const HireXForm = () => {
         <div className="text-center space-y-4">
           <h1 className="text-3xl font-bold text-foreground">HireX - Job Requisition Form</h1>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Create a comprehensive job requisition with detailed requirements, skills, and business justification.
+            Create a comprehensive job requisition with detailed requirements and conditional logic based on work arrangement.
           </p>
+          {workArrangement && (
+            <Badge variant="secondary" className="text-lg px-4 py-2">
+              {workArrangement === "offshore" ? "Offshore Position" : "Onsite Position"}
+            </Badge>
+          )}
         </div>
 
         {/* Stepper */}
         <FormStepper 
-          steps={FORM_STEPS}
+          steps={steps}
           currentStep={currentStep}
           completedSteps={completedSteps}
         />
@@ -233,24 +292,38 @@ export const HireXForm = () => {
                 Previous
               </Button>
 
-              {currentStep < FORM_STEPS.length ? (
-                <Button
-                  type="button"
-                  onClick={nextStep}
-                  className="flex items-center gap-2"
-                >
-                  Next
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              ) : (
-                <Button
-                  type="submit"
-                  className="flex items-center gap-2"
-                >
-                  Submit Requisition
-                  <CheckCircle className="h-4 w-4" />
-                </Button>
-              )}
+              <div className="flex gap-3">
+                {currentStep > 1 && currentStep < maxSteps && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={saveAndContinue}
+                    className="flex items-center gap-2"
+                  >
+                    <Save className="h-4 w-4" />
+                    Save & Continue
+                  </Button>
+                )}
+
+                {currentStep < maxSteps ? (
+                  <Button
+                    type="button"
+                    onClick={nextStep}
+                    className="flex items-center gap-2"
+                  >
+                    Next
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    type="submit"
+                    className="flex items-center gap-2"
+                  >
+                    Submit Requisition
+                    <CheckCircle className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </div>
           </form>
         </Form>
@@ -260,7 +333,71 @@ export const HireXForm = () => {
 };
 
 // Step Components
-const BasicDetailsStep = ({ form }: { form: any }) => {
+const WorkArrangementStep = ({ form }: { form: any }) => {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Building className="h-5 w-5" />
+          Work Arrangement
+        </CardTitle>
+        <CardDescription>
+          Choose the work arrangement type to determine the required steps
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <FormField
+          control={form.control}
+          name="workArrangement"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-lg font-medium">Work Arrangement Type *</FormLabel>
+              <FormDescription>
+                This choice will determine the form steps and required information
+              </FormDescription>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <Card 
+                  className={`cursor-pointer transition-all hover:shadow-md ${
+                    field.value === "offshore" ? "ring-2 ring-primary bg-primary/5" : ""
+                  }`}
+                  onClick={() => field.onChange("offshore")}
+                >
+                  <CardContent className="p-6 text-center">
+                    <MapPin className="h-12 w-12 mx-auto mb-4 text-primary" />
+                    <h3 className="text-xl font-semibold mb-2">Offshore</h3>
+                    <p className="text-muted-foreground text-sm mb-4">
+                      Remote positions with offshore teams
+                    </p>
+                    <Badge variant="outline">5 Steps Required</Badge>
+                  </CardContent>
+                </Card>
+
+                <Card 
+                  className={`cursor-pointer transition-all hover:shadow-md ${
+                    field.value === "onsite" ? "ring-2 ring-primary bg-primary/5" : ""
+                  }`}
+                  onClick={() => field.onChange("onsite")}
+                >
+                  <CardContent className="p-6 text-center">
+                    <Building className="h-12 w-12 mx-auto mb-4 text-primary" />
+                    <h3 className="text-xl font-semibold mb-2">Onsite</h3>
+                    <p className="text-muted-foreground text-sm mb-4">
+                      Positions requiring physical presence
+                    </p>
+                    <Badge variant="outline">6 Steps Required</Badge>
+                  </CardContent>
+                </Card>
+              </div>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </CardContent>
+    </Card>
+  );
+};
+
+const BasicDetailsStep = ({ form, workArrangement }: { form: any; workArrangement: string }) => {
   return (
     <Card>
       <CardHeader>
@@ -287,11 +424,9 @@ const BasicDetailsStep = ({ form }: { form: any }) => {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="full-time">Full-time</SelectItem>
-                    <SelectItem value="part-time">Part-time</SelectItem>
+                    <SelectItem value="permanent">Permanent</SelectItem>
                     <SelectItem value="contract">Contract</SelectItem>
-                    <SelectItem value="temporary">Temporary</SelectItem>
-                    <SelectItem value="internship">Internship</SelectItem>
+                    <SelectItem value="consultant">Consultant</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -305,9 +440,26 @@ const BasicDetailsStep = ({ form }: { form: any }) => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Job Title *</FormLabel>
-                <FormControl>
-                  <Input placeholder="e.g. Senior Software Engineer" {...field} />
-                </FormControl>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select job title" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="software-engineer">Software Engineer</SelectItem>
+                    <SelectItem value="senior-software-engineer">Senior Software Engineer</SelectItem>
+                    <SelectItem value="lead-software-engineer">Lead Software Engineer</SelectItem>
+                    <SelectItem value="product-manager">Product Manager</SelectItem>
+                    <SelectItem value="senior-product-manager">Senior Product Manager</SelectItem>
+                    <SelectItem value="ux-designer">UX Designer</SelectItem>
+                    <SelectItem value="senior-ux-designer">Senior UX Designer</SelectItem>
+                    <SelectItem value="data-analyst">Data Analyst</SelectItem>
+                    <SelectItem value="senior-data-analyst">Senior Data Analyst</SelectItem>
+                    <SelectItem value="devops-engineer">DevOps Engineer</SelectItem>
+                    <SelectItem value="senior-devops-engineer">Senior DevOps Engineer</SelectItem>
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
@@ -315,6 +467,20 @@ const BasicDetailsStep = ({ form }: { form: any }) => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="requestedDate"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Requested Date *</FormLabel>
+                <FormControl>
+                  <Input type="date" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
           <FormField
             control={form.control}
             name="department"
@@ -342,20 +508,6 @@ const BasicDetailsStep = ({ form }: { form: any }) => {
               </FormItem>
             )}
           />
-
-          <FormField
-            control={form.control}
-            name="requestedDate"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Requested Date *</FormLabel>
-                <FormControl>
-                  <Input type="date" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -365,9 +517,20 @@ const BasicDetailsStep = ({ form }: { form: any }) => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Requested By *</FormLabel>
-                <FormControl>
-                  <Input placeholder="Your name" {...field} />
-                </FormControl>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select requester" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="john-smith">John Smith</SelectItem>
+                    <SelectItem value="sarah-johnson">Sarah Johnson</SelectItem>
+                    <SelectItem value="mike-davis">Mike Davis</SelectItem>
+                    <SelectItem value="emily-brown">Emily Brown</SelectItem>
+                    <SelectItem value="alex-wilson">Alex Wilson</SelectItem>
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
@@ -379,62 +542,107 @@ const BasicDetailsStep = ({ form }: { form: any }) => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Hiring Manager *</FormLabel>
-                <FormControl>
-                  <Input placeholder="Hiring manager name" {...field} />
-                </FormControl>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select hiring manager" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="lisa-anderson">Lisa Anderson</SelectItem>
+                    <SelectItem value="david-martinez">David Martinez</SelectItem>
+                    <SelectItem value="jennifer-taylor">Jennifer Taylor</SelectItem>
+                    <SelectItem value="robert-garcia">Robert Garcia</SelectItem>
+                    <SelectItem value="michelle-lee">Michelle Lee</SelectItem>
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <FormField
+          control={form.control}
+          name="numberOfPositions"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Number of Positions *</FormLabel>
+              <FormControl>
+                <Input 
+                  type="number" 
+                  min="1" 
+                  {...field} 
+                  onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Conditional Date Fields */}
+        {workArrangement === "offshore" && (
           <FormField
             control={form.control}
-            name="numberOfPositions"
+            name="expectedDateOfOnboarding"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Number of Positions *</FormLabel>
+                <FormLabel>Expected Date of Onboarding</FormLabel>
                 <FormControl>
-                  <Input 
-                    type="number" 
-                    min="1" 
-                    {...field} 
-                    onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                  />
+                  <Input type="date" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
+        )}
 
+        {workArrangement === "onsite" && (
           <FormField
             control={form.control}
-            name="billable"
+            name="idealStartDate"
             render={({ field }) => (
-              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                <div className="space-y-0.5">
-                  <FormLabel>Billable Position</FormLabel>
-                  <FormDescription className="text-xs">
-                    Is this a client-billable role?
-                  </FormDescription>
-                </div>
+              <FormItem>
+                <FormLabel>Ideal Start Date</FormLabel>
                 <FormControl>
-                  <Switch
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
+                  <Input type="date" {...field} />
                 </FormControl>
+                <FormMessage />
               </FormItem>
             )}
           />
+        )}
 
+        <FormField
+          control={form.control}
+          name="billable"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Billable *</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Is this position billable?" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="yes">Yes</SelectItem>
+                  <SelectItem value="no">No</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {form.watch("billable") === "yes" && (
           <FormField
             control={form.control}
             name="clientBillingRate"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Client Billing Rate</FormLabel>
+                <FormLabel>Client Billing Rate *</FormLabel>
                 <FormControl>
                   <Input 
                     type="number" 
@@ -447,7 +655,7 @@ const BasicDetailsStep = ({ form }: { form: any }) => {
               </FormItem>
             )}
           />
-        </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
@@ -489,45 +697,48 @@ const BasicDetailsStep = ({ form }: { form: any }) => {
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="expectedSalaryMin"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Expected Salary Min *</FormLabel>
-                <FormControl>
-                  <Input 
-                    type="number" 
-                    placeholder="Minimum salary"
-                    {...field} 
-                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+        {/* Expected Salary Range - Offshore Only */}
+        {workArrangement === "offshore" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="expectedSalaryMin"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Expected Salary Min</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      placeholder="Minimum salary"
+                      {...field} 
+                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-          <FormField
-            control={form.control}
-            name="expectedSalaryMax"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Expected Salary Max *</FormLabel>
-                <FormControl>
-                  <Input 
-                    type="number" 
-                    placeholder="Maximum salary"
-                    {...field} 
-                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+            <FormField
+              control={form.control}
+              name="expectedSalaryMax"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Expected Salary Max</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      placeholder="Maximum salary"
+                      {...field} 
+                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -542,7 +753,7 @@ const SkillsQualificationsStep = ({ form }: { form: any }) => {
           Skills & Qualifications
         </CardTitle>
         <CardDescription>
-          Define the technical and professional requirements
+          Define the required skills, experience, and educational qualifications
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -552,16 +763,15 @@ const SkillsQualificationsStep = ({ form }: { form: any }) => {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Primary Skills *</FormLabel>
-              <FormControl>
-                <MultiSelectSkills
-                  selectedSkills={field.value || []}
-                  onSelectionChange={field.onChange}
-                  placeholder="Select primary skills..."
-                />
-              </FormControl>
               <FormDescription>
-                Core skills that are essential for this role
+                Select the essential skills required for this position
               </FormDescription>
+              <MultiSelectSkills
+                selectedSkills={field.value}
+                onSelectionChange={field.onChange}
+                placeholder="Select primary skills..."
+                label="Primary Skills"
+              />
               <FormMessage />
             </FormItem>
           )}
@@ -573,16 +783,45 @@ const SkillsQualificationsStep = ({ form }: { form: any }) => {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Secondary Skills</FormLabel>
-              <FormControl>
-                <MultiSelectSkills
-                  selectedSkills={field.value || []}
-                  onSelectionChange={field.onChange}
-                  placeholder="Select secondary skills..."
-                />
-              </FormControl>
               <FormDescription>
-                Additional skills that would be beneficial
+                Select additional skills that would be beneficial
               </FormDescription>
+              <MultiSelectSkills
+                selectedSkills={field.value || []}
+                onSelectionChange={field.onChange}
+                placeholder="Select secondary skills..."
+                label="Secondary Skills"
+              />
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="certifications"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Certifications</FormLabel>
+              <FormDescription>
+                Select relevant certifications for this role
+              </FormDescription>
+              <MultiSelectSkills
+                selectedSkills={field.value || []}
+                onSelectionChange={field.onChange}
+                placeholder="Select certifications..."
+                label="Certifications"
+                availableSkills={[
+                  { id: "1", name: "AWS Certified Solutions Architect", category: "Cloud" },
+                  { id: "2", name: "Azure Fundamentals", category: "Cloud" },
+                  { id: "3", name: "Google Cloud Professional", category: "Cloud" },
+                  { id: "4", name: "Certified Kubernetes Administrator", category: "DevOps" },
+                  { id: "5", name: "PMP", category: "Project Management" },
+                  { id: "6", name: "Scrum Master", category: "Agile" },
+                  { id: "7", name: "CISSP", category: "Security" },
+                  { id: "8", name: "CompTIA Security+", category: "Security" },
+                ]}
+              />
               <FormMessage />
             </FormItem>
           )}
@@ -594,12 +833,12 @@ const SkillsQualificationsStep = ({ form }: { form: any }) => {
             name="experienceYears"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Years of Experience *</FormLabel>
+                <FormLabel>Experience (Years) *</FormLabel>
                 <FormControl>
                   <Input 
                     type="number" 
-                    min="0"
-                    placeholder="Required years of experience"
+                    min="0" 
+                    placeholder="Years of experience"
                     {...field} 
                     onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                   />
@@ -614,56 +853,18 @@ const SkillsQualificationsStep = ({ form }: { form: any }) => {
             name="education"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Education Level *</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select education level" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="high-school">High School</SelectItem>
-                    <SelectItem value="associate">Associate Degree</SelectItem>
-                    <SelectItem value="bachelor">Bachelor's Degree</SelectItem>
-                    <SelectItem value="master">Master's Degree</SelectItem>
-                    <SelectItem value="phd">PhD</SelectItem>
-                    <SelectItem value="certification">Professional Certification</SelectItem>
-                  </SelectContent>
-                </Select>
+                <FormLabel>Education *</FormLabel>
+                <FormControl>
+                  <Input 
+                    placeholder="e.g., Bachelor's in Computer Science"
+                    {...field}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
-
-        <FormField
-          control={form.control}
-          name="certifications"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Certifications</FormLabel>
-              <FormControl>
-                <MultiSelectSkills
-                  selectedSkills={field.value || []}
-                  onSelectionChange={field.onChange}
-                  placeholder="Select certifications..."
-                  availableSkills={[
-                    { id: "1", name: "AWS Certified", category: "Cloud" },
-                    { id: "2", name: "PMP", category: "Project Management" },
-                    { id: "3", name: "Scrum Master", category: "Agile" },
-                    { id: "4", name: "CISSP", category: "Security" },
-                    { id: "5", name: "Google Cloud Certified", category: "Cloud" },
-                    { id: "6", name: "Microsoft Azure Certified", category: "Cloud" },
-                  ]}
-                />
-              </FormControl>
-              <FormDescription>
-                Professional certifications relevant to the role
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
       </CardContent>
     </Card>
   );
@@ -678,112 +879,19 @@ const ProjectClientStep = ({ form }: { form: any }) => {
           Project & Client Information
         </CardTitle>
         <CardDescription>
-          Details about the project and client assignment
+          Provide details about the project and client
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <FormField
-          control={form.control}
-          name="projectName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Project Name *</FormLabel>
-              <FormControl>
-                <Input placeholder="Name of the project" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="clientName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Client Name *</FormLabel>
-              <FormControl>
-                <Input placeholder="Client or customer name" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="businessUnit"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Business Unit *</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select business unit" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="consulting">Consulting</SelectItem>
-                  <SelectItem value="product-development">Product Development</SelectItem>
-                  <SelectItem value="managed-services">Managed Services</SelectItem>
-                  <SelectItem value="research-development">Research & Development</SelectItem>
-                  <SelectItem value="support">Support</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </CardContent>
-    </Card>
-  );
-};
-
-const LocationShiftStep = ({ form }: { form: any }) => {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <MapPin className="h-5 w-5" />
-          Location & Shift Information
-        </CardTitle>
-        <CardDescription>
-          Work location, schedule, and time zone preferences
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <FormField
-          control={form.control}
-          name="workMode"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Work Mode *</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select work mode" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="remote">Remote</SelectItem>
-                  <SelectItem value="hybrid">Hybrid</SelectItem>
-                  <SelectItem value="onsite">On-site</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="onsiteLocation"
+            name="projectName"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>On-site Location</FormLabel>
+                <FormLabel>Project Name *</FormLabel>
                 <FormControl>
-                  <Input placeholder="Office location if applicable" {...field} />
+                  <Input placeholder="e.g., E-commerce Platform Redesign" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -792,19 +900,12 @@ const LocationShiftStep = ({ form }: { form: any }) => {
 
           <FormField
             control={form.control}
-            name="onsiteDays"
+            name="clientName"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>On-site Days per Week</FormLabel>
+                <FormLabel>Client Name *</FormLabel>
                 <FormControl>
-                  <Input 
-                    type="number" 
-                    min="0" 
-                    max="7"
-                    placeholder="Days per week in office"
-                    {...field} 
-                    onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                  />
+                  <Input placeholder="e.g., Tech Corp Inc." {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -815,22 +916,147 @@ const LocationShiftStep = ({ form }: { form: any }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="shift"
+            name="businessUnit"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Shift *</FormLabel>
+                <FormLabel>Business Unit *</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select shift" />
+                      <SelectValue placeholder="Select business unit" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="day">Day Shift (9 AM - 5 PM)</SelectItem>
-                    <SelectItem value="evening">Evening Shift (2 PM - 10 PM)</SelectItem>
-                    <SelectItem value="night">Night Shift (10 PM - 6 AM)</SelectItem>
-                    <SelectItem value="flexible">Flexible</SelectItem>
-                    <SelectItem value="rotating">Rotating Shifts</SelectItem>
+                    <SelectItem value="digital-solutions">Digital Solutions</SelectItem>
+                    <SelectItem value="enterprise-systems">Enterprise Systems</SelectItem>
+                    <SelectItem value="cloud-services">Cloud Services</SelectItem>
+                    <SelectItem value="consulting">Consulting</SelectItem>
+                    <SelectItem value="data-analytics">Data Analytics</SelectItem>
+                    <SelectItem value="mobile-development">Mobile Development</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="projectLocation"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Project Location</FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g., New York, NY" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+const LocationShiftStep = ({ form }: { form: any }) => {
+  const watchOnsiteWorkMode = form.watch("onsiteWorkMode");
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <MapPin className="h-5 w-5" />
+          Location & Shift Details
+        </CardTitle>
+        <CardDescription>
+          Specify work location and schedule requirements
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <FormField
+          control={form.control}
+          name="onsiteWorkMode"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Onsite Work Mode *</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select work mode" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="remote">Remote</SelectItem>
+                  <SelectItem value="hybrid">Hybrid</SelectItem>
+                  <SelectItem value="wfo">Work From Office</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {watchOnsiteWorkMode && watchOnsiteWorkMode !== "remote" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="onsiteLocation"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Onsite Location *</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Downtown Office, 123 Main St" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {watchOnsiteWorkMode === "hybrid" && (
+              <FormField
+                control={form.control}
+                name="onsiteDaysInOffice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Onsite Days in Office *</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="1" 
+                        max="7" 
+                        placeholder="Days per week"
+                        {...field} 
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="workShift"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Work Shift *</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select work shift" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="day-shift">Day Shift (9 AM - 5 PM)</SelectItem>
+                    <SelectItem value="evening-shift">Evening Shift (1 PM - 9 PM)</SelectItem>
+                    <SelectItem value="night-shift">Night Shift (9 PM - 5 AM)</SelectItem>
+                    <SelectItem value="flexible">Flexible Hours</SelectItem>
+                    <SelectItem value="rotational">Rotational Shifts</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -843,7 +1069,7 @@ const LocationShiftStep = ({ form }: { form: any }) => {
             name="preferredTimezone"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Preferred Timezone *</FormLabel>
+                <FormLabel>Preferred Timezone</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
@@ -855,7 +1081,7 @@ const LocationShiftStep = ({ form }: { form: any }) => {
                     <SelectItem value="cst">Central Time (CST)</SelectItem>
                     <SelectItem value="mst">Mountain Time (MST)</SelectItem>
                     <SelectItem value="pst">Pacific Time (PST)</SelectItem>
-                    <SelectItem value="utc">UTC</SelectItem>
+                    <SelectItem value="gmt">Greenwich Mean Time (GMT)</SelectItem>
                     <SelectItem value="ist">Indian Standard Time (IST)</SelectItem>
                     <SelectItem value="cet">Central European Time (CET)</SelectItem>
                   </SelectContent>
@@ -876,10 +1102,10 @@ const JobDescriptionStep = ({ form }: { form: any }) => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FileText className="h-5 w-5" />
-          Job Description & Expectations
+          Job Descriptions & Expectations
         </CardTitle>
         <CardDescription>
-          Detailed job purpose, duties, and specifications
+          Define the role purpose, duties, and specifications
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -889,10 +1115,13 @@ const JobDescriptionStep = ({ form }: { form: any }) => {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Job Purpose *</FormLabel>
+              <FormDescription>
+                Describe the overall purpose and objectives of this role
+              </FormDescription>
               <FormControl>
                 <Textarea 
-                  placeholder="Describe the main purpose and objectives of this role..."
-                  rows={3}
+                  placeholder="e.g., Lead the development of scalable web applications..."
+                  className="min-h-[100px]"
                   {...field} 
                 />
               </FormControl>
@@ -903,14 +1132,17 @@ const JobDescriptionStep = ({ form }: { form: any }) => {
 
         <FormField
           control={form.control}
-          name="duties"
+          name="primaryDuties"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Key Duties & Responsibilities *</FormLabel>
+              <FormLabel>Primary Duties *</FormLabel>
+              <FormDescription>
+                List the main responsibilities and day-to-day tasks
+              </FormDescription>
               <FormControl>
                 <Textarea 
-                  placeholder="List the main duties and responsibilities..."
-                  rows={5}
+                  placeholder="e.g., • Design and implement new features&#10;• Collaborate with cross-functional teams&#10;• Mentor junior developers..."
+                  className="min-h-[120px]"
                   {...field} 
                 />
               </FormControl>
@@ -921,14 +1153,17 @@ const JobDescriptionStep = ({ form }: { form: any }) => {
 
         <FormField
           control={form.control}
-          name="specifications"
+          name="jobSpecifications"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Job Specifications *</FormLabel>
+              <FormDescription>
+                Detail the technical requirements and qualifications
+              </FormDescription>
               <FormControl>
                 <Textarea 
-                  placeholder="Technical specifications and requirements..."
-                  rows={4}
+                  placeholder="e.g., • 5+ years of React development experience&#10;• Strong knowledge of TypeScript&#10;• Experience with AWS services..."
+                  className="min-h-[120px]"
                   {...field} 
                 />
               </FormControl>
@@ -943,10 +1178,13 @@ const JobDescriptionStep = ({ form }: { form: any }) => {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Good to Have</FormLabel>
+              <FormDescription>
+                Additional skills or experience that would be beneficial
+              </FormDescription>
               <FormControl>
                 <Textarea 
-                  placeholder="Additional qualifications that would be beneficial..."
-                  rows={3}
+                  placeholder="e.g., • Experience with Docker and Kubernetes&#10;• Knowledge of GraphQL&#10;• Previous startup experience..."
+                  className="min-h-[100px]"
                   {...field} 
                 />
               </FormControl>
@@ -961,10 +1199,171 @@ const JobDescriptionStep = ({ form }: { form: any }) => {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Additional Notes</FormLabel>
+              <FormDescription>
+                Any other relevant information or special requirements
+              </FormDescription>
               <FormControl>
                 <Textarea 
-                  placeholder="Any additional information or special requirements..."
-                  rows={3}
+                  placeholder="Add any additional information about the role..."
+                  className="min-h-[80px]"
+                  {...field} 
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </CardContent>
+    </Card>
+  );
+};
+
+const OnsiteSpecificStep = ({ form }: { form: any }) => {
+  const watchOnsiteSpecificWorkMode = form.watch("onsiteSpecificWorkMode");
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Settings className="h-5 w-5" />
+          Onsite Specific Requirements
+        </CardTitle>
+        <CardDescription>
+          Additional requirements specific to onsite positions
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <FormField
+          control={form.control}
+          name="onsiteSpecificWorkMode"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Onsite Specific Work Mode *</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select work mode" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="remote">Remote</SelectItem>
+                  <SelectItem value="hybrid">Hybrid</SelectItem>
+                  <SelectItem value="wfo">Work From Office</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {watchOnsiteSpecificWorkMode && watchOnsiteSpecificWorkMode !== "remote" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="onsiteSpecificLocation"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Onsite Specific Location</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Specific office location" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {watchOnsiteSpecificWorkMode === "hybrid" && (
+              <FormField
+                control={form.control}
+                name="onsiteSpecificDaysInOffice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Onsite Specific Days in Office</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="1" 
+                        max="7" 
+                        placeholder="Days per week"
+                        {...field} 
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="onsiteSpecificWorkShift"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Onsite Specific Work Shift</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select work shift" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="day-shift">Day Shift (9 AM - 5 PM)</SelectItem>
+                    <SelectItem value="evening-shift">Evening Shift (1 PM - 9 PM)</SelectItem>
+                    <SelectItem value="night-shift">Night Shift (9 PM - 5 AM)</SelectItem>
+                    <SelectItem value="flexible">Flexible Hours</SelectItem>
+                    <SelectItem value="rotational">Rotational Shifts</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="onsiteSpecificPreferredTimezone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Onsite Specific Preferred Timezone</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select timezone" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="est">Eastern Time (EST)</SelectItem>
+                    <SelectItem value="cst">Central Time (CST)</SelectItem>
+                    <SelectItem value="mst">Mountain Time (MST)</SelectItem>
+                    <SelectItem value="pst">Pacific Time (PST)</SelectItem>
+                    <SelectItem value="gmt">Greenwich Mean Time (GMT)</SelectItem>
+                    <SelectItem value="ist">Indian Standard Time (IST)</SelectItem>
+                    <SelectItem value="cet">Central European Time (CET)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <FormField
+          control={form.control}
+          name="additionalInstructions"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Additional Instructions</FormLabel>
+              <FormDescription>
+                Any specific instructions or requirements for onsite work
+              </FormDescription>
+              <FormControl>
+                <Textarea 
+                  placeholder="e.g., Security clearance required, specific equipment needs..."
+                  className="min-h-[100px]"
                   {...field} 
                 />
               </FormControl>
